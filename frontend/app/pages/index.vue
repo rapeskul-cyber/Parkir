@@ -12,7 +12,7 @@ const form = ref({
 })
 
 const isLoading = ref(false)
-const errorMessage = ref('') // <--- INI YANG SEBELUMNYA KURANG / BELUM ADA
+const errorMessage = ref('')
 const showPassword = ref(false)
 
 const handleLogin = async () => {
@@ -46,39 +46,43 @@ const handleLogin = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-100 flex items-center justify-center p-6">
-    <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md">
-      <!-- Header Form -->
-      <div class="text-center mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">Selamat Datang</h1>
-        <p class="text-sm text-gray-500 mt-1">Silakan masuk ke akun Anda</p>
+  <div class="min-h-screen bg-[#F4F4F0] flex items-center justify-center p-6 font-sans">
+    <div class="bg-white p-8 sm:p-10 rounded-[35px] border-2 border-slate-900 shadow-[8px_8px_0px_0px_#0f172a] w-full max-w-md transition-all">
+      
+      <!-- Header Branding ala Referensi -->
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-slate-900 text-[#FACC15] font-black text-2xl border-2 border-slate-900 mb-4 shadow-[4px_4px_0px_0px_#FACC15]">
+          P
+        </div>
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight">PLAZA ANDALAS</h1>
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Sistem Manajemen Parkir</p>
       </div>
 
-      <!-- Pesan Error (Sekarang aman karena errorMessage sudah dideklarasikan) -->
+      <!-- Pesan Error -->
       <div
         v-if="errorMessage"
-        class="bg-red-100 border border-red-400 text-red-700 px-5 py-3 rounded-full text-sm mb-4 text-center"
+        class="bg-amber-50 border-2 border-amber-400 text-amber-900 px-4 py-3 rounded-2xl text-xs font-bold mb-6 text-center animate-shake"
       >
         {{ errorMessage }}
       </div>
 
       <!-- Form Login -->
-      <form @submit.prevent="handleLogin" class="space-y-4">
+      <form @submit.prevent="handleLogin" class="space-y-5">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1 ml-3">
-            Email
+          <label class="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2 ml-1">
+            Email Petugas / Admin
           </label>
           <input
             v-model="form.email"
             type="email"
             required
-            placeholder="username@gmail.com"
-            class="w-full border border-gray-300 rounded-full px-5 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition"
+            placeholder="nama@parkir.com"
+            class="w-full bg-slate-50 border-2 border-slate-900 rounded-2xl px-5 py-3.5 text-sm font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-[#FACC15] transition"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1 ml-3">
+          <label class="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2 ml-1">
             Password
           </label>
           <div class="relative">
@@ -87,13 +91,12 @@ const handleLogin = async () => {
               :type="showPassword ? 'text' : 'password'"
               required
               placeholder="••••••••"
-              class="w-full border border-gray-300 rounded-full pl-5 pr-12 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition"
+              class="w-full bg-slate-50 border-2 border-slate-900 rounded-2xl pl-5 pr-12 py-3.5 text-sm font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-[#FACC15] transition"
             />
             <button
               type="button"
               @click="showPassword = !showPassword"
-              class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
-              title="Tampilkan/Sembunyikan Password"
+              class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 focus:outline-none"
             >
               <EyeIcon v-if="showPassword" class="w-5 h-5" />
               <EyeSlashIcon v-else class="w-5 h-5" />
@@ -104,11 +107,19 @@ const handleLogin = async () => {
         <button
           type="submit"
           :disabled="isLoading"
-          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-full transition disabled:opacity-50 mt-2 shadow-md cursor-pointer"
+          class="w-full bg-[#FACC15] hover:bg-[#eab308] text-slate-950 font-black py-4 rounded-2xl border-2 border-slate-900 shadow-[4px_4px_0px_0px_#0f172a] hover:shadow-[2px_2px_0px_0px_#0f172a] hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50 cursor-pointer mt-4 uppercase tracking-wider text-xs"
         >
-          {{ isLoading ? "Memproses..." : "Masuk" }}
+          {{ isLoading ? "MEMPROSES..." : "MASUK KE SISTEM →" }}
         </button>
       </form>
+
+      <!-- Footer Info -->
+      <div class="mt-8 text-center">
+        <p class="text-[11px] font-bold text-slate-400">
+          Secure Parking Control Panel v2.0
+        </p>
+      </div>
+
     </div>
   </div>
 </template>

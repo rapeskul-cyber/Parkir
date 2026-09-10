@@ -1,18 +1,30 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { Line } from 'vue-chartjs'
-import { 
-  Chart as ChartJS, 
-  CategoryScale, 
-  LinearScale, 
-  PointElement, 
-  LineElement, 
-  Title, 
-  Tooltip, 
-  Legend 
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { Line, Bar } from 'vue-chartjs'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
 } from 'chart.js'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+)
 
 definePageMeta({
   middleware: 'auth'
@@ -28,81 +40,145 @@ const stats = ref({
   sedang_parkir: 0
 })
 
-// State untuk data grafik realtime
-const chartData = ref({
-  labels: ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'],
+const timeFilter = ref<'today' | 'week' | 'month'>('today')
+const chartMode = ref<'bar' | 'line'>('line')
+const aktivitasTerbaru = ref<any[]>([])
+let intervalId: any = null
+
+// State penampung chart 100% data backend
+const serverCharts = ref({
+  today: {
+    labels: ['06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'],
+    current: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    previous: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    currLabel: 'Hari Ini',
+    prevLabel: 'Kemarin'
+  },
+  week: {
+    labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
+    current: [0, 0, 0, 0, 0, 0, 0],
+    previous: [0, 0, 0, 0, 0, 0, 0],
+    currLabel: 'Minggu Ini',
+    prevLabel: 'Minggu Lalu'
+  },
+  month: {
+    labels: ['Mgg 1', 'Mgg 2', 'Mgg 3', 'Mgg 4'],
+    current: [0, 0, 0, 0],
+    previous: [0, 0, 0, 0],
+    currLabel: 'Bulan Ini',
+    prevLabel: 'Bulan Lalu'
+  }
+})
+
+const datasetsByFilter = computed(() => {
+  return serverCharts.value[timeFilter.value]
+})
+
+const chartData = computed(() => ({
+  labels: datasetsByFilter.value.labels,
   datasets: [
     {
-      label: 'Kendaraan Masuk Realtime',
-      backgroundColor: '#10B981',
-      borderColor: '#10B981',
-      data: [0, 0, 0, 0, 0, 0],
-      tension: 0.4,
+      label: datasetsByFilter.value.currLabel,
+      borderColor: '#4F46E5',
+      backgroundColor: chartMode.value === 'bar' ? '#4F46E5' : 'rgba(79, 70, 229, 0.08)',
+      fill: chartMode.value === 'line',
+      borderWidth: 2.5,
+      borderRadius: chartMode.value === 'bar' ? 6 : 0,
+      pointRadius: chartMode.value === 'line' ? 3 : 0,
+      pointHoverRadius: 6,
+      pointBackgroundColor: '#4F46E5',
+      tension: 0.35,
+      data: datasetsByFilter.value.current
+    },
+    {
+      label: datasetsByFilter.value.prevLabel,
+      borderColor: '#F59E0B',
+      backgroundColor: chartMode.value === 'bar' ? '#F59E0B' : 'rgba(245, 158, 11, 0.05)',
+      fill: chartMode.value === 'line',
+      borderWidth: 2,
+      borderRadius: chartMode.value === 'bar' ? 6 : 0,
+      pointRadius: chartMode.value === 'line' ? 3 : 0,
+      pointHoverRadius: 6,
+      pointBackgroundColor: '#F59E0B',
+      tension: 0.35,
+      data: datasetsByFilter.value.previous
     }
   ]
-})
+}))
 
 const chartOptions = ref({
   responsive: true,
   maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#0B0F19',
+      titleFont: { size: 11, weight: 'bold' },
+      bodyFont: { size: 11 },
+      padding: 10,
+      cornerRadius: 8
+    }
+  },
+  scales: {
+    x: {
+      grid: { display: false },
+      ticks: { color: '#94A3B8', font: { size: 11, weight: 'bold' } }
+    },
+    y: {
+      border: { dash: [4, 4] },
+      grid: { color: '#F1F5F9' },
+      ticks: {
+        color: '#94A3B8',
+        font: { size: 11 },
+        precision: 0
+      }
+    }
+  }
 })
-
-const aktivitasTerbaru = ref<any[]>([])
-const tanggalHariIni = ref(new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }))
-
-let intervalId: any = null
 
 const loadDashboardData = async () => {
   try {
     const res = await $api.get('/dashboard/stats')
-    if (res.data && res.data.data) {
+    if (res.data?.data) {
       stats.value = res.data.data
       if (res.data.data.transaksi_terbaru) {
         aktivitasTerbaru.value = res.data.data.transaksi_terbaru
       }
-
-      // Update grafik secara dinamis mengikuti data hari ini
-      const totalHariIni = stats.value.kendaraan_hari_ini || 0
-      chartData.value = {
-        ...chartData.value,
-        datasets: [{
-          ...chartData.value.datasets[0],
-          data: [2, 5, 8, 12, 16, totalHariIni]
-        }]
+      if (res.data.data.chart) {
+        serverCharts.value = res.data.data.chart
       }
     }
+
+    const resAktif = await $api.get('/parkir/aktif')
+    if (resAktif.data?.data) {
+      stats.value.sedang_parkir = resAktif.data.data.length
+    }
   } catch (error) {
-    console.error("Gagal mengambil data real-time dashboard", error)
+    console.error('Failed to retrieve dashboard metrics', error)
   }
 }
 
 const formatRupiah = (val: any) => {
   const num = Number(val)
-  if (isNaN(num)) return '0'
-  return new Intl.NumberFormat('id-ID').format(num)
+  return isNaN(num) ? '0' : new Intl.NumberFormat('id-ID').format(num)
 }
 
 const formatWaktu = (dateStr: string) => {
   if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+  return new Date(dateStr).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
 }
 
 const logout = async () => {
   try {
     await $api.post('/logout')
-  } catch (e) {
-    // Abaikan error jaringan
-  }
+  } catch {}
   localStorage.removeItem('token')
   router.push('/')
 }
 
 onMounted(() => {
   loadDashboardData()
-  intervalId = setInterval(() => {
-    loadDashboardData()
-  }, 5000)
+  intervalId = setInterval(loadDashboardData, 3000)
 })
 
 onUnmounted(() => {
@@ -111,89 +187,115 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-100 flex font-sans">
-    
-    <!-- SIDEBAR KIRI -->
-    <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col justify-between p-5 select-none hidden md:flex">
+  <div class="min-h-screen bg-[#F8FAFC] flex font-sans antialiased text-slate-800">
+    <aside class="w-64 bg-[#0B0F19] text-slate-400 flex flex-col justify-between py-6 px-4 shrink-0 select-none hidden md:flex">
       <div>
-        <!-- Logo / Header Brand -->
-        <div class="flex items-center gap-3 px-2 mb-8">
-          <div class="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-black text-lg shadow-lg">
-            P
-          </div>
-          <div>
-            <h2 class="text-white font-extrabold tracking-wide text-sm">PARKIR</h2>
-            <p class="text-[10px] text-slate-400 uppercase tracking-wider">PLAZA ANDALAS</p>
-          </div>
-        </div>
-
-        <!-- Profil Petugas -->
-        <div class="bg-slate-800/60 border border-slate-700/50 p-3.5 rounded-2xl flex items-center gap-3 mb-8">
-          <div class="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center border border-emerald-500/30">
-            P
-          </div>
-          <div>
-            <h3 class="text-xs font-bold text-white">Petugas Parkir</h3>
-            <div class="flex items-center gap-1.5 mt-0.5">
-              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span class="text-[10px] text-slate-400 font-medium">Online</span>
+        <div class="flex items-center justify-between px-2 mb-7">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-xl bg-cyan-500 text-[#0B0F19] flex items-center justify-center font-black text-sm">
+              P
+            </div>
+            <div>
+              <span class="text-base font-extrabold tracking-tight text-white block leading-none">PARKIR</span>
+              <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest">PLAZA ANDALAS</span>
             </div>
           </div>
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
         </div>
 
-        <!-- Menu Utama -->
-        <div class="space-y-1.5">
-          <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">Menu Utama</p>
-          
-          <NuxtLink 
-            to="/petugas/member/select" 
-            class="flex items-center justify-between p-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition group"
+        <nav class="space-y-1">
+          <NuxtLink
+            to="/petugas"
+            class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-slate-800/90 text-white font-semibold text-xs transition shadow-xs"
           >
-            <div class="flex items-center gap-3">
-              <span class="p-2 rounded-lg bg-slate-800 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition">👥</span>
-              <span>Kelola Member</span>
-            </div>
-            <span class="text-slate-500 text-xs">›</span>
+            <span class="text-sm">⊞</span>
+            <span>Dashboard</span>
           </NuxtLink>
 
-          <NuxtLink 
-            to="/petugas/transaksi" 
-            class="flex items-center justify-between p-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition group"
+          <NuxtLink
+            to="/petugas/user"
+            class="flex items-center justify-between px-3.5 py-2.5 rounded-xl hover:bg-slate-800/40 hover:text-white text-xs font-semibold transition"
           >
             <div class="flex items-center gap-3">
-              <span class="p-2 rounded-lg bg-slate-800 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition">🚗</span>
+              <span class="text-sm">🟢</span>
+              <span>Gate Masuk</span>
+            </div>
+            <span class="text-xs text-slate-600">›</span>
+          </NuxtLink>
+
+          <NuxtLink
+            to="/petugas/keluar"
+            class="flex items-center justify-between px-3.5 py-2.5 rounded-xl hover:bg-slate-800/40 hover:text-white text-xs font-semibold transition"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-sm">🚪</span>
+              <span>Gate Keluar (Kasir)</span>
+            </div>
+            <span class="text-xs text-slate-600">›</span>
+          </NuxtLink>
+
+          <NuxtLink
+            to="/petugas/transaksi"
+            class="flex items-center justify-between px-3.5 py-2.5 rounded-xl hover:bg-slate-800/40 hover:text-white text-xs font-semibold transition"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-sm">🚗</span>
               <span>Kelola Transaksi</span>
             </div>
-            <span class="text-slate-500 text-xs">›</span>
+            <span class="text-xs text-slate-600">›</span>
           </NuxtLink>
 
-          <NuxtLink 
-            to="/petugas/laporan/member" 
-            class="flex items-center justify-between p-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition group"
+          <NuxtLink
+            to="/petugas/member/select"
+            class="flex items-center justify-between px-3.5 py-2.5 rounded-xl hover:bg-slate-800/40 hover:text-white text-xs font-semibold transition"
           >
             <div class="flex items-center gap-3">
-              <span class="p-2 rounded-lg bg-slate-800 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition">📊</span>
+              <span class="text-sm">👥</span>
+              <span>Kelola Member</span>
+            </div>
+            <span class="text-xs text-slate-600">›</span>
+          </NuxtLink>
+
+          <NuxtLink
+            to="/petugas/laporan/member"
+            class="flex items-center justify-between px-3.5 py-2.5 rounded-xl hover:bg-slate-800/40 hover:text-white text-xs font-semibold transition"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-sm">📊</span>
               <span>Laporan</span>
             </div>
-            <span class="text-slate-500 text-xs">›</span>
+            <span class="text-xs text-slate-600">›</span>
           </NuxtLink>
-        </div>
 
-        <!-- Status Sistem Box -->
-        <div class="mt-8 bg-emerald-950/30 border border-emerald-900/40 p-3.5 rounded-2xl flex items-center gap-3">
-          <div class="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">⚡</div>
-          <div>
-            <p class="text-[10px] text-emerald-400/80 font-medium">Status Sistem</p>
-            <p class="text-xs font-extrabold text-emerald-400">Sistem Aktif</p>
-          </div>
-        </div>
+          <NuxtLink
+            to="/petugas/markir"
+            class="flex items-center justify-between px-3.5 py-2.5 rounded-xl hover:bg-slate-800/40 hover:text-white text-xs font-semibold transition"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-sm">🅿️</span>
+              <span>Sedang Parkir</span>
+            </div>
+            <span class="text-[10px] bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full font-bold">
+              {{ stats.sedang_parkir || 0 }}
+            </span>
+          </NuxtLink>
+        </nav>
       </div>
 
-      <!-- Tombol Logout -->
-      <div>
-        <button 
+      <div class="space-y-3 pt-4 border-t border-slate-800/80">
+        <div class="bg-slate-900/80 border border-slate-800 px-3.5 py-2.5 rounded-xl flex items-center gap-3">
+          <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold">
+            P
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-bold text-white truncate">Petugas Parkir</p>
+            <p class="text-[10px] text-emerald-400 font-medium">Sistem Aktif</p>
+          </div>
+        </div>
+
+        <button
           @click="logout"
-          class="w-full flex items-center gap-3 p-3 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+          class="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
         >
           <span>🚪</span>
           <span>Logout</span>
@@ -201,192 +303,248 @@ onUnmounted(() => {
       </div>
     </aside>
 
-    <!-- KONTEN UTAMA KANAN -->
-    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
-      
-      <!-- Top Bar -->
-      <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-xs">
+    <main class="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+      <header class="bg-white px-7 py-4 flex items-center justify-between border-b border-slate-100 shrink-0">
         <div>
-          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dashboard Petugas</span>
-          <h1 class="text-xl font-black text-slate-800 flex items-center gap-2">
-            Selamat Datang 🔥
-          </h1>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Plaza Andalas System</span>
+          <h1 class="text-lg font-extrabold text-slate-900 tracking-tight">Dashboard Overview</h1>
         </div>
+
         <div class="flex items-center gap-3">
-          <div class="text-right">
-            <p class="text-xs font-bold text-slate-700">Hari ini</p>
-            <p class="text-[11px] text-slate-400 font-medium">{{ tanggalHariIni }}</p>
+          <div class="bg-slate-100 p-0.5 rounded-full flex items-center text-xs font-bold text-slate-500">
+            <button
+              @click="timeFilter = 'today'"
+              :class="timeFilter === 'today' ? 'bg-[#0B0F19] text-white shadow-xs' : 'hover:text-slate-900'"
+              class="px-3.5 py-1.5 rounded-full transition cursor-pointer"
+            >
+              Hari Ini
+            </button>
+            <button
+              @click="timeFilter = 'week'"
+              :class="timeFilter === 'week' ? 'bg-[#0B0F19] text-white shadow-xs' : 'hover:text-slate-900'"
+              class="px-3.5 py-1.5 rounded-full transition cursor-pointer"
+            >
+              Minggu Ini
+            </button>
+            <button
+              @click="timeFilter = 'month'"
+              :class="timeFilter === 'month' ? 'bg-[#0B0F19] text-white shadow-xs' : 'hover:text-slate-900'"
+              class="px-3.5 py-1.5 rounded-full transition cursor-pointer"
+            >
+              Bulan Ini
+            </button>
           </div>
+
+          <NuxtLink
+            to="/petugas/user"
+            class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+          >
+            <span>+</span>
+            <span>Gate Masuk</span>
+          </NuxtLink>
         </div>
       </header>
 
-      <!-- Area Dashboard Body -->
-      <div class="p-6 space-y-6">
-        
-        <!-- BARIS 1: 4 KARTU STATISTIK UTAMA (REALTIME) -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
-          <!-- Kartu 1: Total Member -->
-          <div class="bg-white p-5 rounded-3xl shadow-xs border border-slate-200/60 flex flex-col justify-between relative overflow-hidden">
-            <div class="flex justify-between items-start mb-4">
-              <div class="p-3 rounded-2xl bg-slate-100 text-slate-700">👥</div>
-              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600">Aktif</span>
+      <div class="p-7 space-y-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-1.5">
+                <span class="w-6 h-6 rounded-md bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">💰</span>
+                <span class="text-xs font-bold text-slate-700">Total Pendapatan</span>
+              </div>
+              <span class="text-[10px] font-bold text-emerald-500">↑ 38.21%</span>
             </div>
             <div>
-              <p class="text-xs font-bold text-slate-400 mb-1">Total Member</p>
-              <h3 class="text-2xl font-black text-slate-800">{{ stats.member_aktif || 0 }}</h3>
-              <p class="text-[10px] text-slate-400 mt-1 font-medium">Member terdaftar</p>
+              <h3 class="text-xl font-black text-slate-900 tracking-tight">
+                Rp {{ formatRupiah(stats.pendapatan_hari_ini || 0) }}
+              </h3>
+              <div class="flex items-center justify-between text-[10px] text-slate-400 mt-2">
+                <span>Periode Transaksi</span>
+                <span class="font-bold text-slate-700 capitalize">{{ timeFilter }}</span>
+              </div>
             </div>
           </div>
 
-          <!-- Kartu 2: Kendaraan Masuk -->
-          <div class="bg-white p-5 rounded-3xl shadow-xs border border-slate-200/60 flex flex-col justify-between relative overflow-hidden">
-            <div class="flex justify-between items-start mb-4">
-              <div class="p-3 rounded-2xl bg-blue-50 text-blue-600">🚗</div>
-              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600">Hari ini</span>
+          <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-1.5">
+                <span class="w-6 h-6 rounded-md bg-sky-500 text-white flex items-center justify-center text-xs">🚗</span>
+                <span class="text-xs font-bold text-slate-700">Sedang Parkir</span>
+              </div>
+              <span class="text-[10px] font-bold text-emerald-500">Live Sync</span>
             </div>
             <div>
-              <p class="text-xs font-bold text-slate-400 mb-1">Kendaraan Masuk</p>
-              <h3 class="text-2xl font-black text-slate-800">{{ stats.kendaraan_hari_ini || 0 }}</h3>
-              <p class="text-[10px] text-slate-400 mt-1 font-medium">Transaksi kendaraan</p>
+              <h3 class="text-xl font-black text-slate-900 tracking-tight">
+                {{ stats.sedang_parkir || 0 }} Unit
+              </h3>
+              <div class="flex items-center justify-between text-[10px] text-slate-400 mt-2">
+                <span>Total Kendaraan Aktif</span>
+                <NuxtLink to="/petugas/markir" class="font-bold text-indigo-600 hover:underline">Lihat Area ›</NuxtLink>
+              </div>
             </div>
           </div>
 
-          <!-- Kartu 3: Pendapatan -->
-          <div class="bg-white p-5 rounded-3xl shadow-xs border border-slate-200/60 flex flex-col justify-between relative overflow-hidden">
-            <div class="flex justify-between items-start mb-4">
-              <div class="p-3 rounded-2xl bg-emerald-50 text-emerald-600">💰</div>
-              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600">Hari ini</span>
+          <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-1.5">
+                <span class="w-6 h-6 rounded-md bg-teal-500 text-white flex items-center justify-center text-xs">📊</span>
+                <span class="text-xs font-bold text-slate-700">Kendaraan Masuk</span>
+              </div>
+              <span class="text-[10px] font-bold text-emerald-500">↑ 28.21%</span>
             </div>
             <div>
-              <p class="text-xs font-bold text-slate-400 mb-1">Pendapatan</p>
-              <h3 class="text-xl font-black text-slate-800">Rp {{ formatRupiah(stats.pendapatan_hari_ini || 0) }}</h3>
-              <p class="text-[10px] text-slate-400 mt-1 font-medium">Total transaksi</p>
+              <h3 class="text-xl font-black text-slate-900 tracking-tight">
+                {{ stats.kendaraan_hari_ini || 0 }} Tiket
+              </h3>
+              <div class="flex items-center justify-between text-[10px] text-slate-400 mt-2">
+                <span>Total Pos Masuk</span>
+                <span class="font-bold text-slate-700">Gate Terdata</span>
+              </div>
             </div>
           </div>
 
-          <!-- Kartu 4: Sedang Parkir (Bisa Diklik) -->
-          <NuxtLink 
-            to="/petugas/markir" 
-            class="bg-white p-5 rounded-3xl shadow-xs border border-slate-200/60 flex flex-col justify-between relative overflow-hidden hover:border-purple-300 hover:shadow-md transition group cursor-pointer"
-          >
-            <div class="flex justify-between items-start mb-4">
-              <div class="p-3 rounded-2xl bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition">🅿️</div>
-              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-600">Live ›</span>
+          <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-1.5">
+                <span class="w-6 h-6 rounded-md bg-amber-500 text-white flex items-center justify-center text-xs">👥</span>
+                <span class="text-xs font-bold text-slate-700">Member Aktif</span>
+              </div>
             </div>
-            <div>
-              <p class="text-xs font-bold text-slate-400 mb-1">Sedang Parkir</p>
-              <h3 class="text-2xl font-black text-slate-800">{{ stats.sedang_parkir || 0 }}</h3>
-              <p class="text-[10px] text-slate-400 mt-1 font-medium">Klik untuk lihat detail</p>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <p class="text-sm font-black text-slate-900">{{ stats.member_aktif || 0 }} Org</p>
+                <p class="text-[9px] text-slate-400">Terdaftar</p>
+              </div>
+              <div>
+                <p class="text-sm font-black text-slate-900">Lunas</p>
+                <p class="text-[9px] text-emerald-500 font-bold">Status Member</p>
+              </div>
             </div>
-          </NuxtLink>
-
+          </div>
         </div>
 
-        <!-- GRAFIK REALTIME -->
-        <div class="bg-white p-6 rounded-3xl shadow-xs border border-slate-200/60">
-          <div class="flex justify-between items-center mb-4">
-            <div>
-              <h2 class="text-xs font-black uppercase tracking-wider text-slate-400">ANALISTIK</h2>
-              <h3 class="text-base font-extrabold text-slate-800">Grafik Kendaraan Masuk (Realtime)</h3>
+        <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
+          <div class="flex items-center justify-between mb-5">
+            <div class="bg-slate-100 p-0.5 rounded-lg flex items-center text-xs font-bold">
+              <button
+                @click="chartMode = 'bar'"
+                :class="chartMode === 'bar' ? 'bg-cyan-600 text-white' : 'text-slate-500'"
+                class="px-3 py-1 rounded-md transition cursor-pointer"
+              >
+                Bar Chart
+              </button>
+              <button
+                @click="chartMode = 'line'"
+                :class="chartMode === 'line' ? 'bg-cyan-600 text-white' : 'text-slate-500'"
+                class="px-3 py-1 rounded-md transition cursor-pointer"
+              >
+                Line Chart
+              </button>
             </div>
-            <span class="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-3 py-1 rounded-full animate-pulse">● Live Sync</span>
+
+            <div class="flex items-center gap-4 text-xs font-bold text-slate-600">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-xs bg-indigo-600"></span>
+                <span>{{ datasetsByFilter.currentLabel }}</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-xs bg-amber-500"></span>
+                <span>{{ datasetsByFilter.previousLabel }}</span>
+              </div>
+            </div>
           </div>
+
           <div class="h-64 relative">
-            <Line :data="chartData" :options="chartOptions" />
+            <Line v-if="chartMode === 'line'" :data="chartData" :options="chartOptions" />
+            <Bar v-else :data="chartData" :options="chartOptions" />
           </div>
         </div>
 
-        <!-- BARIS 2: SHORTCUT & MONITORING AKTivITAS TERBARU -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          <!-- Shortcut / Akses Cepat -->
-          <div class="bg-white p-6 rounded-3xl shadow-xs border border-slate-200/60">
-            <h2 class="text-xs font-black uppercase tracking-wider text-slate-400 mb-4">SHORTCUT</h2>
-            <h3 class="text-base font-extrabold text-slate-800 mb-5">Akses Cepat</h3>
-
-            <div class="space-y-3">
-              <NuxtLink 
-                to="/petugas/user" 
-                class="flex items-center justify-between p-3.5 rounded-2xl bg-emerald-50/50 hover:bg-emerald-100/50 transition border border-emerald-100 group"
-              >
-                <div class="flex items-center gap-3.5">
-                  <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">🟢</div>
-                  <div>
-                    <h4 class="text-xs font-bold text-slate-800">Gate Masuk</h4>
-                    <p class="text-[11px] text-slate-400">Buka pos gerbang masuk kendaraan</p>
-                  </div>
-                </div>
-                <span class="text-emerald-600 text-sm group-hover:translate-x-1 transition">›</span>
-              </NuxtLink>
-
-              <NuxtLink 
-                to="/petugas/keluar" 
-                class="flex items-center justify-between p-3.5 rounded-2xl bg-blue-50/50 hover:bg-blue-100/50 transition border border-blue-100 group"
-              >
-                <div class="flex items-center gap-3.5">
-                  <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold">🚪</div>
-                  <div>
-                    <h4 class="text-xs font-bold text-slate-800">Gate Keluar (Kasir)</h4>
-                    <p class="text-[11px] text-slate-400">Scan tiket umum & pembayaran member</p>
-                  </div>
-                </div>
-                <span class="text-blue-600 text-sm group-hover:translate-x-1 transition">›</span>
-              </NuxtLink>
-
-              <NuxtLink 
-                to="/petugas/member/select" 
-                class="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 transition border border-slate-100 group"
-              >
-                <div class="flex items-center gap-3.5">
-                  <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold">👥</div>
-                  <div>
-                    <h4 class="text-xs font-bold text-slate-800">Kelola Member</h4>
-                    <p class="text-[11px] text-slate-400">Tambah & kelola member</p>
-                  </div>
-                </div>
-                <span class="text-slate-400 text-sm group-hover:translate-x-1 transition">›</span>
-              </NuxtLink>
-
-              <NuxtLink 
-                to="/petugas/transaksi" 
-                class="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 transition border border-slate-100 group"
-              >
-                <div class="flex items-center gap-3.5">
-                  <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold">🚗</div>
-                  <div>
-                    <h4 class="text-xs font-bold text-slate-800">Kelola Transaksi</h4>
-                    <p class="text-[11px] text-slate-400">Kelola transaksi kendaraan</p>
-                  </div>
-                </div>
-                <span class="text-slate-400 text-sm group-hover:translate-x-1 transition">›</span>
-              </NuxtLink>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold text-slate-800">Distribusi Kendaraan Aktif</h3>
+              <span class="text-[10px] bg-slate-100 font-bold px-2 py-0.5 rounded text-slate-600">Live</span>
             </div>
-          </div>
 
-          <!-- Monitoring Aktivitas Terbaru -->
-          <div class="bg-white p-6 rounded-3xl shadow-xs border border-slate-200/60">
-            <h2 class="text-xs font-black uppercase tracking-wider text-slate-400 mb-4">MONITORING</h2>
-            <h3 class="text-base font-extrabold text-slate-800 mb-5">Aktivitas Terbaru</h3>
-
-            <div class="space-y-3.5">
-              <div v-if="aktivitasTerbaru.length === 0" class="text-xs text-slate-400 text-center py-4">
-                Belum ada aktivitas terbaru.
-              </div>
-              
-              <div v-for="item in aktivitasTerbaru" :key="item.id" class="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs">💰</div>
-                <div class="flex-1 min-w-0">
-                  <h4 class="text-xs font-bold text-slate-800 truncate">Plat: {{ item.plat_nomor || item.no_plat || '-' }}</h4>
-                  <p class="text-[10px] text-slate-400">Tiket: {{ item.kode_tiket }} | Rp {{ formatRupiah(item.total_tarif || item.total_bayar) }}</p>
+            <div class="py-5 flex flex-col items-center justify-center">
+              <div class="relative w-40 h-20 overflow-hidden flex items-end justify-center">
+                <div class="w-40 h-40 rounded-full border-[12px] border-indigo-600 border-b-transparent border-l-rose-500 border-t-amber-400 rotate-[-45deg]"></div>
+                <div class="absolute bottom-0 flex flex-col items-center">
+                  <span class="text-2xl font-black text-slate-900 leading-none">{{ stats.sedang_parkir || 0 }}</span>
+                  <span class="text-[9px] text-slate-400 font-bold mt-0.5 uppercase">Unit di Lokasi</span>
                 </div>
-                <span class="text-[10px] font-bold text-slate-400">{{ formatWaktu(item.created_at) }}</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-center gap-3 pt-3 border-t border-slate-50 text-[10px] font-bold text-slate-500">
+              <div class="flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                <span>Non-Member</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span>Member</span>
               </div>
             </div>
           </div>
 
-        </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold text-slate-800">Kapasitas Sensor Gate</h3>
+              <span class="text-emerald-500 font-bold text-[10px]">Normal</span>
+            </div>
 
+            <div class="flex items-center justify-between py-4">
+              <div class="space-y-1 text-[11px] text-slate-600 font-medium">
+                <p>Gate Masuk 1: <strong class="text-indigo-600">Aktif</strong></p>
+                <p>Gate Masuk 2: <strong class="text-amber-500">Aktif</strong></p>
+                <p>Gate Kasir Keluar: <strong class="text-teal-500">Standby</strong></p>
+              </div>
+
+              <div class="relative w-24 h-24 flex items-center justify-center">
+                <div class="absolute inset-0 rounded-full border-[3px] border-indigo-600 border-t-transparent rotate-45"></div>
+                <div class="absolute inset-2 rounded-full border-[3px] border-amber-400 border-r-transparent rotate-90"></div>
+                <div class="absolute inset-4 rounded-full border-[3px] border-teal-400 border-b-transparent"></div>
+                <div class="flex flex-col items-center">
+                  <span class="text-base font-black text-slate-900 leading-none">100%</span>
+                  <span class="text-[8px] text-slate-400 font-bold">ONLINE</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-2.5 border-t border-slate-50 text-[10px] text-slate-400 text-center font-bold">Monitoring Palang Pintu Otomatis</div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold text-slate-800">Transaksi Kasir Keluar</h3>
+              <NuxtLink to="/petugas/transaksi" class="text-indigo-600 font-bold text-[10px] hover:underline">Semua ›</NuxtLink>
+            </div>
+
+            <div class="space-y-2 py-2">
+              <div v-if="aktivitasTerbaru.length === 0" class="text-center text-slate-400 text-xs py-4">
+                Belum ada transaksi keluar.
+              </div>
+              <div
+                v-for="item in aktivitasTerbaru.slice(0, 3)"
+                :key="item.id"
+                class="flex items-center justify-between p-2 rounded-xl bg-slate-50 text-[11px]"
+              >
+                <div class="truncate">
+                  <span class="font-bold text-slate-800 block truncate">{{ item.plat_nomor || item.no_plat || item.kode_tiket }}</span>
+                  <span class="text-[9px] text-slate-400">{{ formatWaktu(item.created_at) }}</span>
+                </div>
+                <span class="font-bold text-emerald-600 shrink-0">
+                  Rp {{ formatRupiah(item.total_tarif || item.total_bayar) }}
+                </span>
+              </div>
+            </div>
+
+            <div class="pt-2.5 border-t border-slate-50 text-[10px] text-slate-400 text-center font-bold">Sinkronisasi Kasir Realtime</div>
+          </div>
+        </div>
       </div>
     </main>
   </div>

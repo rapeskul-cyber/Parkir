@@ -1,41 +1,91 @@
 <template>
-  <div class="min-h-screen bg-slate-100 flex items-center justify-center p-5">
-    <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-[440px]">
-      <h1 class="text-xl font-black text-center text-slate-800 uppercase tracking-wider mb-6">
-        Tambah Akun Petugas / Admin
-      </h1>
+  <div class="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-5 font-sans antialiased text-slate-800">
+    <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-xs w-full max-w-[460px] space-y-6">
+      
+      <!-- Brand & Header Form -->
+      <div class="text-center space-y-1">
+        <div class="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-cyan-400 text-[#0B0F19] font-black text-lg mb-2 shadow-[0_0_15px_rgba(34,211,238,0.25)]">
+          P
+        </div>
+        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">ADMINISTRATOR CONTROL</span>
+        <h1 class="text-lg font-black text-slate-900 tracking-tight">Tambah Akun Baru</h1>
+        <p class="text-xs text-slate-400">Buat kredensial akses untuk petugas pos atau admin.</p>
+      </div>
 
+      <!-- Input Fields -->
       <div class="space-y-4">
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Nama Petugas</label>
-          <input v-model="form.name" type="text" placeholder="Masukkan nama" class="w-full p-2.5 bg-slate-100 rounded-xl border border-slate-300 text-sm font-bold text-slate-800 focus:outline-none" />
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">Nama Lengkap</label>
+          <input
+            v-model="form.name"
+            type="text"
+            placeholder="Contoh: Rian Pratama"
+            class="w-full bg-slate-50 border border-slate-200 focus:border-[#0284C7] focus:bg-white focus:ring-2 focus:ring-[#0284C7]/20 rounded-2xl px-4 py-3 text-xs font-bold text-slate-800 outline-none transition"
+          />
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Email</label>
-          <input v-model="form.email" type="email" placeholder="petugas@parkir.com" class="w-full p-2.5 bg-slate-100 rounded-xl border border-slate-300 text-sm font-bold text-slate-800 focus:outline-none" />
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">Alamat Email</label>
+          <input
+            v-model="form.email"
+            type="email"
+            placeholder="nama@parkir.com"
+            class="w-full bg-slate-50 border border-slate-200 focus:border-[#0284C7] focus:bg-white focus:ring-2 focus:ring-[#0284C7]/20 rounded-2xl px-4 py-3 text-xs font-bold text-slate-800 outline-none transition"
+          />
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Password</label>
-          <input v-model="form.password" type="password" placeholder="Minimal 6 karakter" class="w-full p-2.5 bg-slate-100 rounded-xl border border-slate-300 text-sm font-bold text-slate-800 focus:outline-none" />
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">Password</label>
+          <input
+            v-model="form.password"
+            type="password"
+            placeholder="Minimal 6 karakter"
+            class="w-full bg-slate-50 border border-slate-200 focus:border-[#0284C7] focus:bg-white focus:ring-2 focus:ring-[#0284C7]/20 rounded-2xl px-4 py-3 text-xs font-bold text-slate-800 outline-none transition"
+          />
         </div>
 
-        <!-- PILIHAN ROLE (ADMIN / PETUGAS) -->
+        <!-- Role Access -->
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Hak Akses (Role)</label>
-          <select v-model="form.role" class="w-full p-2.5 bg-slate-100 rounded-xl border border-slate-300 text-sm font-bold text-slate-800 focus:outline-none">
-            <option value="petugas">Petugas (Kasir)</option>
-            <option value="admin">Admin (Full Access)</option>
-          </select>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">Hak Akses (Role)</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              @click="form.role = 'petugas'"
+              class="p-3 rounded-2xl border text-xs font-extrabold flex flex-col items-center gap-1 transition cursor-pointer"
+              :class="form.role === 'petugas' ? 'bg-[#0B0F19] text-white border-[#0B0F19] shadow-xs' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'"
+            >
+              <span>🚪 Petugas</span>
+              <span class="text-[10px] font-normal opacity-80">Kasir & Gerbang</span>
+            </button>
+            <button
+              type="button"
+              @click="form.role = 'admin'"
+              class="p-3 rounded-2xl border text-xs font-extrabold flex flex-col items-center gap-1 transition cursor-pointer"
+              :class="form.role === 'admin' ? 'bg-[#0B0F19] text-white border-[#0B0F19] shadow-xs' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'"
+            >
+              <span>⚡ Admin</span>
+              <span class="text-[10px] font-normal opacity-80">Full Control</span>
+            </button>
+          </div>
         </div>
 
-        <div class="pt-2 flex flex-col gap-2">
-          <button @click="simpanPetugas" :disabled="loading" type="button" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-xl font-bold text-sm shadow-md transition uppercase tracking-wider cursor-pointer">
-            {{ loading ? 'Menyimpan...' : 'Simpan Akun' }}
+        <!-- Action Buttons -->
+        <div class="pt-3 space-y-2">
+          <button
+            @click="simpanPetugas"
+            :disabled="loading"
+            type="button"
+            class="w-full bg-[#0284C7] hover:bg-[#0369A1] disabled:bg-slate-300 text-white py-3.5 rounded-2xl font-black text-xs transition cursor-pointer shadow-xs uppercase tracking-wider"
+          >
+            {{ loading ? 'Menyimpan Akun...' : 'Simpan Akun Petugas' }}
           </button>
-          <button @click="router.push('/admin/petugas')" type="button" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer">
-            Kembali
+          
+          <button
+            @click="router.push('/admin/petugas')"
+            type="button"
+            class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 py-3 rounded-2xl font-bold text-xs transition cursor-pointer"
+          >
+            Kembali ke Daftar Petugas
           </button>
         </div>
       </div>
@@ -58,7 +108,7 @@ const form = reactive({
   name: '',
   email: '',
   password: '',
-  role: 'petugas' // Default sebagai petugas
+  role: 'petugas'
 })
 
 const simpanPetugas = async () => {
@@ -75,7 +125,6 @@ const simpanPetugas = async () => {
   loading.value = true
   try {
     await $api.post('/admin/petugas', form)
-    alert('Akun berhasil ditambahkan!')
     router.push('/admin/petugas')
   } catch (err: any) {
     alert(err?.response?.data?.message || 'Gagal menyimpan akun.')

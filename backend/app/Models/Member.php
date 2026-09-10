@@ -9,11 +9,14 @@ class Member extends Model
 {
     use HasFactory;
 
+    protected $table = 'members';
+
     protected $fillable = [
         'kode_member',
+        'token',
         'nama_member',
         'nama_perusahaan',
-        'harga',
+        'total_harga',
         'jumlah_bayar',
         'kembalian',
         'status',

@@ -28,7 +28,7 @@ class TransaksiController extends Controller
 
     public function store(Request $request)
     {
-        // 1. Validasi disesuaikan dengan payload dari Nuxt (tiket_id & bayar)
+        // Validasi disesuaikan dengan payload dari Nuxt (tiket_id & bayar)
         $request->validate([
             'tiket_id'    => 'required',
             'bayar'       => 'required|numeric|min:0',
@@ -45,7 +45,7 @@ class TransaksiController extends Controller
             ], 400);
         }
 
-        // 2. Ambil data tiket berdasarkan tiket_id
+        // Ambil data tiket berdasarkan tiket_id
         $tiket = TiketParkir::find($request->tiket_id);
         $kodeTiket = $tiket ? $tiket->kode_tiket : ('TIKET-' . $request->tiket_id);
 
@@ -57,7 +57,7 @@ class TransaksiController extends Controller
 
         $kembalian = $uangBayar - $tarif;
 
-        // 3. Simpan transaksi keuangan
+        //  Simpan transaksi keuangan
         $transaksi = Transaksi::create([
             'kode_tiket'    => $kodeTiket,
             'kategori'      => $request->kategori ?? 'motor',

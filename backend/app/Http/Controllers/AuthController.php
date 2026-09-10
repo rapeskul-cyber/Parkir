@@ -25,7 +25,7 @@ class AuthController extends Controller
 
         $user = Auth::user();
         
-        // Buat token untuk autentikasi
+        // token untuk autentikasi
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([

@@ -13,6 +13,7 @@ protected $table="tiket_parkir";
 protected $fillable=[
 'kode_tiket',
 'qr_code',
+'kategori',
 'status',
 'waktu_masuk',
 'waktu_keluar'

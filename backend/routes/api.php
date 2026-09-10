@@ -30,9 +30,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Auth Logout
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Route Gate Scan (Dipindah ke sini agar token Axios terbawa dengan aman)
+    // Route Gate Masuk & Keluar
+    Route::post('/gate/masuk-member', [MemberGateController::class, 'masukMember']);
     Route::post('/gate/scan', [MemberGateController::class, 'scanGate']);
-
+    
     // Route Member
     Route::post('/member/bayar/{id}', [MemberController::class, 'bayarMember']);
     Route::put('/member/{id}/pembayaran', [MemberController::class, 'updatePembayaran']);

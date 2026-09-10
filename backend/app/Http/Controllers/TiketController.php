@@ -3,13 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\TiketParkir;
+use App\Models\Member;
 use Illuminate\Http\Request;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Carbon\Carbon;
 
 class TiketController extends Controller
 {
-   public function qrcode($kode)
+    public function qrcode($kode)
     {
         if (ob_get_length()) {
             ob_clean();
@@ -21,12 +22,12 @@ class TiketController extends Controller
             ->header('Content-Type', 'image/svg+xml; charset=utf-8');
     }
 
-    /**
-     * Buat Tiket Masuk Baru (Pintu Masuk User)
-     */
-    public function create()
+    public function create(Request $request)
     {
         try {
+            // Ambil kategori dari request (default: motor jika kosong)
+            $kategori = strtolower($request->kategori ?? 'motor');
+
             $randomNum = mt_rand(100, 999);
             $kode = "A" . $randomNum;
 
@@ -35,12 +36,13 @@ class TiketController extends Controller
                 $kode = "A" . $randomNum;
             }
 
-   $qrSvg = QrCode::format('svg')->size(200)->generate($kode);
+            $qrSvg = QrCode::format('svg')->size(200)->generate($kode);
             $qrCodeBase64 = 'data:image/svg+xml;base64,' . base64_encode($qrSvg);
 
             $tiket = TiketParkir::create([
                 'kode_tiket'   => $kode,
                 'qr_code'      => $qrCodeBase64,
+                'kategori'     => $kategori, // <-- SIMPAN KATEGORI KENDARAAN (motor / mobil)
                 'status'       => 'masuk',
                 'waktu_masuk'  => now(),
                 'waktu_keluar' => null,
@@ -72,7 +74,7 @@ class TiketController extends Controller
             ], 404);
         }
 
-        $waktuMasuk = Carbon::parse($tiket->waktu_masuk);
+        $waktuMasuk = Carbon::parse($tiket->waktu_masuk ?? $tiket->created_at);
         $waktuSekarang = Carbon::now();
         $durasiJam = ceil($waktuMasuk->diffInMinutes($waktuSekarang) / 60);
         if ($durasiJam < 1) $durasiJam = 1;
@@ -99,9 +101,9 @@ class TiketController extends Controller
         ]);
 
         return response()->json([
-            'status' => true,
+            'status'  => true,
             'success' => true,
-            'data' => $tiket
+            'data'    => $tiket
         ]);
     }
 
@@ -121,20 +123,38 @@ class TiketController extends Controller
         ]);
     }
 
-   // Di TiketController.php atau TransaksiController.php
-public function kendaraanAktif()
-{
-    // Mengambil tiket yang statusnya BELUM 'keluar'
-    $data = TiketParkir::where('status', '!=', 'keluar')
-                ->orderBy('created_at', 'desc')
-                ->get();
+    public function kendaraanAktif()
+    {
+        try {
+            // HANYA ambil tiket yang berstatus 'masuk' (belum checkout)
+            $kendaraanParkir = TiketParkir::where('status', 'masuk')
+                ->latest('waktu_masuk')
+                ->get()
+                ->map(function ($item) {
+                    $isMember = str_starts_with($item->kode_tiket, 'MBR');
+                    return [
+                        'id'         => $item->id,
+                        'kode_tiket' => $item->kode_tiket,
+                        'kategori'   => $item->kategori ?? ($isMember ? 'Mobil / Motor' : 'Motor'),
+                        'no_plat'    => $item->plat_nomor ?? $item->no_plat ?? '-',
+                        'created_at' => $item->waktu_masuk ?? $item->created_at,
+                        'tipe'       => $isMember ? 'Member' : 'Non-Member'
+                    ];
+                });
 
-    return response()->json([
-        'status' => true,
-        'message' => 'Daftar kendaraan yang masih parkir',
-        'data' => $data
-    ], 200);
-}
+            return response()->json([
+                'status'  => true,
+                'message' => 'Daftar gabungan kendaraan aktif',
+                'data'    => $kendaraanParkir
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Gagal mengambil kendaraan aktif: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 
     public function destroy($id)
     {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Member;
+use App\Models\TiketParkir;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
@@ -10,32 +11,22 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class MemberController extends Controller
 {
-    // Mengambil daftar member (Sekaligus cek otomatis status expired)
     public function index()
     {
         try {
-            $members = Member::all();
-
-           foreach ($members as $member) {
-    if ($member->tanggal_expired) {
-        $now = Carbon::now();
-        $expired = Carbon::parse($member->tanggal_expired);
-
-        // Jika sudah lewat dari tanggal expired, ubah jadi belum lunas
-        if ($now->greaterThan($expired) && $member->status === 'lunas') {
-            $member->status = 'belum lunas';
-            $member->save();
-        } 
-        // Perbaikan: gunakan spasi 'belum lunas' sesuai database
-        elseif ($now->lessThanOrEqualTo($expired) && $member->status === 'belum lunas' && $member->jumlah_bayar >= $member->total_harga) {
-            $member->status = 'lunas';
-            $member->save();
-        }
-    }
-}
-
-            // Urutkan kembali berdasarkan yang terbaru setelah dicek
             $members = Member::latest()->get();
+
+            foreach ($members as $member) {
+                if (!empty($member->tanggal_expired)) {
+                    $now = Carbon::now();
+                    $expired = Carbon::parse($member->tanggal_expired);
+
+                    if ($now->greaterThan($expired) && $member->status === 'lunas') {
+                        $member->status = 'belum lunas';
+                        $member->save();
+                    }
+                }
+            }
 
             return response()->json([
                 "status" => true,
@@ -49,19 +40,18 @@ class MemberController extends Controller
         }
     }
 
-    // Menyimpan data member baru dan menghitung status pembayaran (Pas 1 Bulan)
     public function store(Request $request)
     {
         try {
             $request->validate([
                 'nama_member'     => 'required',
                 'nama_perusahaan' => 'required',
-                'uang_bayar'      => 'required|numeric|min:0'
             ]);
 
-            $harga_member = 150000;
-            $uang_bayar   = (float) $request->uang_bayar;
+            $uang_bayar   = (float) ($request->uang_bayar ?? $request->jumlah_bayar ?? 0);
+            $harga_member = 150000; 
             $kembalian    = max(0, $uang_bayar - $harga_member);
+            
             $status       = $uang_bayar >= $harga_member ? "lunas" : "belum lunas";
 
             $tanggalMulai  = Carbon::now();
@@ -80,6 +70,18 @@ class MemberController extends Controller
                 'tanggal_expired' => $berlakuSampai
             ]);
 
+            // Jika pendaftaran dilakukan saat masuk di pos dan langsung parkir:
+            if ($status === 'lunas') {
+                TiketParkir::create([
+                    'kode_tiket'   => $member->kode_member,
+                    'plat_nomor'   => $request->plat_nomor ?? $member->nama_member,
+                    'kategori'     => $request->kategori ?? 'Mobil / Motor',
+                    'status'       => 'masuk',
+                    'waktu_masuk'  => now(),
+                    'waktu_keluar' => null,
+                ]);
+            }
+
             return response()->json([
                 "status"  => true,
                 "message" => "Member berhasil dibuat",
@@ -93,7 +95,6 @@ class MemberController extends Controller
         }
     }
 
-    // Membuat kode unik member
     private function generateKodeMember()
     {
         do {
@@ -103,47 +104,52 @@ class MemberController extends Controller
         return $kode;
     }
 
-    // Menampilkan detail member (Sekaligus cek otomatis status expired)
     public function show($id)
     {
-        $member = Member::find($id);
+        try {
+            $member = Member::find($id);
 
-        if (!$member) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Member tidak ditemukan'
-            ], 404);
-        }
-
-        if ($member->status === 'lunas' && $member->tanggal_expired) {
-            if (Carbon::now()->greaterThan(Carbon::parse($member->tanggal_expired))) {
-                $member->status = 'belum lunas';
-                $member->save();
+            if (!$member) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Member tidak ditemukan'
+                ], 404);
             }
+
+            if ($member->status === 'lunas' && !empty($member->tanggal_expired)) {
+                if (Carbon::now()->greaterThan(Carbon::parse($member->tanggal_expired))) {
+                    $member->status = 'belum lunas';
+                    $member->save();
+                }
+            }
+
+            $svg = QrCode::format('svg')->size(200)->generate($member->kode_member);
+            $qr = base64_encode($svg);
+
+            return response()->json([
+                'status' => true,
+                'data'   => [
+                    'id'              => $member->id,
+                    'kode_member'     => $member->kode_member,
+                    'nama_member'     => $member->nama_member,
+                    'nama_perusahaan' => $member->nama_perusahaan,
+                    'total_harga'     => $member->total_harga ?? 150000,
+                    'jumlah_bayar'    => $member->jumlah_bayar ?? 0,
+                    'status'          => $member->status,
+                    'tanggal_mulai'   => $member->tanggal_mulai,
+                    'tanggal_bayar'   => $member->tanggal_bayar,
+                    'tanggal_expired' => $member->tanggal_expired,
+                    'qr'              => "data:image/svg+xml;base64," . $qr
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
         }
-
-        $svg = QrCode::format('svg')->size(200)->generate($member->kode_member);
-        $qr = base64_encode($svg);
-
-        return response()->json([
-            'status' => true,
-            'data' => [
-                'id'              => $member->id,
-                'kode_member'     => $member->kode_member,
-                'nama_member'     => $member->nama_member,
-                'nama_perusahaan' => $member->nama_perusahaan,
-                'total_harga'     => $member->total_harga,
-                'jumlah_bayar'    => $member->jumlah_bayar,
-                'status'          => $member->status,
-                'tanggal_mulai'   => $member->tanggal_mulai,
-                'tanggal_bayar'   => $member->tanggal_bayar,
-                'tanggal_expired' => $member->tanggal_expired,
-                'qr'              => "data:image/svg+xml;base64," . $qr
-            ]
-        ]);
     }
 
-    // Memperbarui pembayaran member (Pas 1 Bulan)
     public function updatePembayaran(Request $request, $id)
     {
         try {
@@ -161,8 +167,9 @@ class MemberController extends Controller
             ]);
 
             $jumlah_bayar = (float) $request->jumlah_bayar;
-            $total_harga  = (float) ($member->total_harga ?? 150000);
-            $status       = $jumlah_bayar >= $total_harga ? "lunas" : "belum lunas";
+            $harga        = (float) ($member->total_harga ?? 150000);
+            
+            $status       = $jumlah_bayar >= $harga ? "lunas" : "belum lunas";
 
             $member->update([
                 'jumlah_bayar'    => $jumlah_bayar,
@@ -184,7 +191,6 @@ class MemberController extends Controller
         }
     }
 
-    // Menghapus data member
     public function destroy($id)
     {
         try {
@@ -211,7 +217,6 @@ class MemberController extends Controller
         }
     }
 
-    // Validasi dan cek status keaktifan member saat discan (Mendukung kode_member / token)
     public function check(Request $request)
     {
         try {
@@ -241,7 +246,7 @@ class MemberController extends Controller
                 ], 404);
             }
 
-            if (Carbon::now()->greaterThan(Carbon::parse($member->tanggal_expired))) {
+            if (!empty($member->tanggal_expired) && Carbon::now()->greaterThan(Carbon::parse($member->tanggal_expired))) {
                 return response()->json([
                     "status"  => false,
                     "message" => "Member sudah expired"
@@ -256,9 +261,9 @@ class MemberController extends Controller
             }
 
             return response()->json([
-                "status" => true,
+                "status"  => true,
                 "message" => "Member valid",
-                "data"   => $member
+                "data"    => $member
             ]);
         } catch (\Exception $e) {
             return response()->json([

@@ -15,8 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Letakkan CORS di posisi paling depan
-        $middleware->prepend(HandleCors::class);
+
+    $middleware->prepend(HandleCors::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // Paksa agar setiap error/exception di API tetap membawa header CORS ke browser

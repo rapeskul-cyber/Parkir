@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
-    // Menampilkan daftar semua petugas/admin
+    // Menampilkan daftar semua petugas
     public function index()
     {
         try {
@@ -18,7 +18,6 @@ class UserController extends Controller
                 'data' => $users
             ], 200);
         } catch (\Exception $e) {
-            // INI AKAN MEMUNCULKAN PESAN ERROR ASLI KE BROWSER
             return response()->json([
                 'status' => false,
                 'message' => 'ERROR DI DATABASE/KODE: ' . $e->getMessage(),
@@ -28,7 +27,7 @@ class UserController extends Controller
         }
     }
 
-    // Menyimpan petugas atau admin baru
+    // Menyimpan petugas baru
     public function store(Request $request)
     {
         try {

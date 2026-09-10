@@ -1,118 +1,266 @@
 <template>
-  <div class="min-h-screen bg-slate-100 p-8">
-    <div class="max-w-5xl mx-auto space-y-6">
-      
-      <!-- Header & Tombol Aksi -->
-      <div class="bg-white p-6 rounded-3xl shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 class="text-xl font-black text-slate-800 uppercase tracking-wider">Manajemen Akun Petugas</h1>
-          <p class="text-xs text-slate-500 font-semibold mt-1">Kelola daftar akun petugas e-parkir</p>
+  <div class="min-h-screen bg-[#F8FAFC] flex font-sans antialiased text-slate-800">
+    <!-- SIDEBAR PERSIS REFERENSI ADMIN -->
+    <aside class="w-64 bg-[#0B0F19] text-slate-400 flex flex-col justify-between py-6 px-4 shrink-0 select-none hidden md:flex">
+      <div>
+        <!-- Brand Header -->
+        <div class="flex items-center justify-between px-2 mb-7">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-cyan-400 text-[#0B0F19] flex items-center justify-center font-black text-base shadow-[0_0_15px_rgba(34,211,238,0.3)]">
+              P
+            </div>
+            <div>
+              <span class="text-base font-extrabold tracking-tight text-white block leading-none">ADMIN PARKIR</span>
+              <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5 block">PLAZA ANDALAS</span>
+            </div>
+          </div>
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
         </div>
-        <div class="flex items-center gap-2 w-full sm:w-auto">
-          <button @click="router.push('/admin/dashboard')" class="flex-1 sm:flex-none bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-4 py-3 rounded-xl transition cursor-pointer text-center">
-            Kembali
-          </button>
-          
-          <!-- TOMBOL TAMBAH PETUGAS -->
-          <button @click="router.push('/admin/petugas/tambah')" class="flex-1 sm:flex-none bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-3 rounded-xl transition cursor-pointer shadow-md text-center">
-            + Tambah Petugas
-          </button>
-        </div>
+
+        <!-- Menu Navigation -->
+        <nav class="space-y-1">
+          <NuxtLink
+            to="/admin/dashboard"
+            class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/40 font-semibold text-xs transition"
+          >
+            <span class="text-sm">⊞</span>
+            <span>Dashboard</span>
+          </NuxtLink>
+
+          <!-- Active: Kelola Petugas -->
+          <NuxtLink
+            to="/admin/petugas"
+            class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-800/90 text-white font-semibold text-xs shadow-xs"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-sm text-cyan-400">👥</span>
+              <span>Kelola Petugas</span>
+            </div>
+            <span class="text-xs text-cyan-400 font-bold">●</span>
+          </NuxtLink>
+
+          <NuxtLink
+            to="/admin/laporan/member"
+            class="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/40 text-xs font-semibold transition"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-sm">📊</span>
+              <span>Laporan</span>
+            </div>
+            <span class="text-xs text-slate-600">›</span>
+          </NuxtLink>
+
+          <NuxtLink
+            to="/petugas/markir"
+            class="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/40 text-xs font-semibold transition"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-sm">🅿️</span>
+              <span>Sedang Parkir</span>
+            </div>
+            <span class="text-xs text-slate-600">›</span>
+          </NuxtLink>
+        </nav>
       </div>
 
-      <!-- Tabel Petugas -->
-      <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs">
-            <thead>
-              <tr class="bg-slate-50 text-slate-500 uppercase font-bold border-b border-slate-200">
-                <th class="p-3">No</th>
-                <th class="p-3">Nama Petugas</th>
-                <th class="p-3">Email</th>
-                <th class="p-3 text-center">Aksi</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 text-slate-700 font-medium">
-              <tr v-for="(petugas, index) in listPetugas" :key="petugas.id" class="hover:bg-slate-50">
-                <td class="p-3 font-bold text-slate-900">{{ index + 1 }}</td>
-                <td class="p-3 font-semibold text-slate-800">{{ petugas.name }}</td>
-                <td class="p-3 text-slate-600">{{ petugas.email }}</td>
-                <td class="p-3 text-center space-x-1.5">
-                  <button
-                    @click="openResetModal(petugas)"
-                    class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer"
-                  >
-                    Reset Password
-                  </button>
-                  <button
-                    @click="hapusPetugas(petugas.id, petugas.name)"
-                    class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer"
-                  >
-                    Hapus
-                  </button>
-                </td>
-              </tr>
-              <tr v-if="listPetugas.length === 0">
-                <td colspan="4" class="p-6 text-center text-slate-400 font-bold">Belum ada data petugas.</td>
-              </tr>
-            </tbody>
-          </table>
+      <!-- Bottom Profile & Logout -->
+      <div class="space-y-3 pt-4 border-t border-slate-800/80">
+        <div class="bg-slate-900/90 border border-slate-800 px-3.5 py-2.5 rounded-2xl flex items-center gap-3">
+          <div class="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center text-xs font-bold">
+            ADM
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-bold text-white truncate">Administrator</p>
+            <p class="text-[10px] text-cyan-400 font-medium">Hak Akses User</p>
+          </div>
+        </div>
+
+        <button
+          @click="logout"
+          class="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+        >
+          <span>🚪</span>
+          <span>Logout</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- CONTENT AREA -->
+    <main class="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+      <!-- TOPBAR HEADER -->
+      <header class="bg-white px-8 py-5 flex items-center justify-between border-b border-slate-100 shrink-0">
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">USER ACCESS MANAGEMENT</span>
+          <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Manajemen Akun Petugas</h1>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+          <button
+            @click="router.push('/admin/dashboard')"
+            class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <span>←</span> Dashboard
+          </button>
+          <button
+            @click="router.push('/admin/petugas/tambah')"
+            class="bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-black px-4 py-2 rounded-xl transition cursor-pointer shadow-xs flex items-center gap-1.5"
+          >
+            <span>+</span> Tambah Petugas
+          </button>
+        </div>
+      </header>
+
+      <!-- BODY WRAPPER -->
+      <div class="p-8 space-y-6">
+        <!-- FILTER & SUMMARY -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="relative w-72">
+            <span class="absolute left-3.5 top-2.5 text-xs text-slate-400">🔍</span>
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Cari nama atau email petugas..."
+              class="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 transition"
+            />
+          </div>
+          <span class="text-xs font-bold text-slate-400">
+            Terdaftar: <strong class="text-slate-700 font-mono">{{ filteredPetugas.length }}</strong> akun petugas kasir
+          </span>
+        </div>
+
+        <!-- TABEL PETUGAS -->
+        <div class="bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50/80 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <th class="py-3.5 px-5 w-16 text-center">No</th>
+                  <th class="py-3.5 px-5">Nama Petugas</th>
+                  <th class="py-3.5 px-5">Email Login</th>
+                  <th class="py-3.5 px-5 text-center">Role Pos</th>
+                  <th class="py-3.5 px-5 text-right">Tindakan</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
+                <tr v-if="loading">
+                  <td colspan="5" class="py-12 text-center text-slate-400 font-bold">
+                    Memuat daftar akun petugas...
+                  </td>
+                </tr>
+                <tr v-else-if="filteredPetugas.length === 0">
+                  <td colspan="5" class="py-12 text-center text-slate-400 font-bold">
+                    Tidak ada akun petugas yang ditemukan.
+                  </td>
+                </tr>
+                <tr
+                  v-else
+                  v-for="(petugas, index) in filteredPetugas"
+                  :key="petugas.id"
+                  class="hover:bg-slate-50/60 transition"
+                >
+                  <td class="py-4 px-5 text-center font-mono font-bold text-slate-400">
+                    {{ index + 1 }}
+                  </td>
+                  <td class="py-4 px-5 font-extrabold text-slate-900">
+                    <div class="flex items-center gap-2.5">
+                      <div class="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 font-black flex items-center justify-center text-xs">
+                        {{ petugas.name ? petugas.name.charAt(0).toUpperCase() : 'P' }}
+                      </div>
+                      <span>{{ petugas.name }}</span>
+                    </div>
+                  </td>
+                  <td class="py-4 px-5 font-mono text-slate-500">
+                    {{ petugas.email }}
+                  </td>
+                  <td class="py-4 px-5 text-center">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      Petugas Pos
+                    </span>
+                  </td>
+                  <td class="py-4 px-5 text-right space-x-1.5">
+                    <button
+                      @click="openResetModal(petugas)"
+                      class="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-xl text-[11px] font-bold transition cursor-pointer"
+                    >
+                      🔑 Reset Password
+                    </button>
+                    <button
+                      @click="hapusPetugas(petugas.id, petugas.name)"
+                      class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-xl text-[11px] font-bold transition cursor-pointer"
+                    >
+                      Hapus
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
+    </main>
 
-    </div>
-
-    <!-- Modal Reset Password -->
-    <div v-if="isResetModalOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-3xl p-6 w-full max-w-md shadow-xl space-y-4">
-        <h2 class="text-base font-bold text-slate-800">Reset Password: {{ activePetugas?.name }}</h2>
+    <!-- MODAL RESET PASSWORD BERGAYA COCKPIT -->
+    <div v-if="isResetModalOpen" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+      <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">CREDENTIAL UPDATE</span>
+          <h3 class="text-base font-black text-slate-900 mt-0.5">Reset Password Petugas</h3>
+          <p class="text-xs text-slate-500 mt-1">
+            Ganti password akun untuk <strong class="text-slate-800">{{ activePetugas?.name }}</strong>.
+          </p>
+        </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">Password Baru</label>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">Password Baru</label>
           <input
             v-model="newPassword"
             type="password"
-            placeholder="Minimal 6 karakter"
-            class="w-full p-3 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900"
+            placeholder="Minimal 6 karakter..."
+            class="w-full bg-slate-50 border border-slate-200 focus:border-[#0284C7] focus:bg-white focus:ring-2 focus:ring-[#0284C7]/20 rounded-2xl px-4 py-3 text-xs font-semibold text-slate-800 outline-none transition"
           />
         </div>
 
-        <div class="flex justify-end gap-2 pt-2">
+        <div class="flex gap-2 pt-2">
           <button
             @click="isResetModalOpen = false"
-            class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
+            type="button"
+            class="flex-1 py-2.5 rounded-xl font-bold text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 transition cursor-pointer"
           >
             Batal
           </button>
           <button
             @click="submitResetPassword"
-            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
+            type="button"
+            class="flex-1 py-2.5 rounded-xl font-black text-xs text-white bg-[#0B0F19] hover:bg-slate-800 transition cursor-pointer shadow-xs"
           >
-            Simpan Perubahan
+            Simpan Password
           </button>
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
-definePageMeta({ 
-  middleware: ['auth', 'cek-admin'] 
+definePageMeta({
+  middleware: ['auth', 'cek-admin']
 })
 
 const { $api } = useNuxtApp()
 const router = useRouter()
 
 const listPetugas = ref<any[]>([])
+const loading = ref(false)
+const searchQuery = ref('')
 const isResetModalOpen = ref(false)
 const activePetugas = ref<any>(null)
 const newPassword = ref('')
 
 const fetchPetugas = async () => {
+  loading.value = true
   try {
     const res = await $api.get('/admin/petugas')
     if (res.data && res.data.status) {
@@ -124,8 +272,20 @@ const fetchPetugas = async () => {
       localStorage.removeItem('token')
       router.push('/login')
     }
+  } finally {
+    loading.value = false
   }
 }
+
+const filteredPetugas = computed(() => {
+  if (!searchQuery.value) return listPetugas.value
+  const q = searchQuery.value.toLowerCase()
+  return listPetugas.value.filter(
+    (item) =>
+      item.name?.toLowerCase().includes(q) ||
+      item.email?.toLowerCase().includes(q)
+  )
+})
 
 const openResetModal = (petugas: any) => {
   activePetugas.value = petugas
@@ -151,7 +311,6 @@ const submitResetPassword = async () => {
   }
 }
 
-// Fungsi Hapus Petugas
 const hapusPetugas = async (id: number, nama: string) => {
   if (!confirm(`Apakah kamu yakin ingin menghapus akun petugas "${nama}"?`)) {
     return
@@ -160,10 +319,18 @@ const hapusPetugas = async (id: number, nama: string) => {
   try {
     const res = await $api.delete(`/admin/petugas/${id}`)
     alert(res.data.message || 'Akun petugas berhasil dihapus!')
-    fetchPetugas() // Refresh ulang tabel
+    fetchPetugas()
   } catch (err: any) {
     alert(err?.response?.data?.message || 'Gagal menghapus akun petugas.')
   }
+}
+
+const logout = async () => {
+  try {
+    await $api.post('/logout')
+  } catch {}
+  localStorage.removeItem('token')
+  router.push('/')
 }
 
 onMounted(() => {

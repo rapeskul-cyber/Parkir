@@ -9,7 +9,7 @@ use App\Models\Transaksi;
 class LaporanController extends Controller
 {
     /**
-     * LAPORAN REKAP GLOBAL (UNTUK KARTU & TABEL RINGKASAN ADMIN)
+     * LAPORAN REKAP
      */
     public function rekapGlobal(Request $request)
     {
@@ -30,7 +30,7 @@ class LaporanController extends Controller
 
             $pendapatanParkir = (clone $queryTransaksi)->sum('total_bayar');
             
-            // Mencari kolom pendapatan member secara aman tanpa bikin error 500
+            // Mencari kolom pendapatan member
             $pendapatanMember = 0;
             try {
                 $pendapatanMember = (clone $queryMember)->sum('tarif') 
@@ -41,7 +41,7 @@ class LaporanController extends Controller
                 $pendapatanMember = 0;
             }
 
-            // Total Pendapatan Gabungan (Parkir + Member)
+            // Total Pendapatan Gabungan
             $totalPendapatan = $pendapatanParkir + $pendapatanMember;
 
             $totalTransaksi = (clone $queryTransaksi)->count();
@@ -53,7 +53,6 @@ class LaporanController extends Controller
                 $totalMotor = (clone $queryTransaksi)->where('kategori', 'motor')->count();
                 $totalMobil = (clone $queryTransaksi)->where('kategori', 'mobil')->count();
             } catch (\Exception $ex) {
-                // Abaikan jika kolom kategori tidak ada di tabel transaksi
             }
 
             $riwayat = $queryTransaksi->latest()->take(50)->get();
